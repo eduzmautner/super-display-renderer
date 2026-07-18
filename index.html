@@ -242,12 +242,16 @@
       order:-1;                /* markup is panel-then-viewport; put the frame on top */
       flex:0 0 auto;
       width:100%;
-      height:50vh;
+      height:40vh;             /* 40/60 split: shorter frame, taller controls */
       position:sticky;
       top:0;
       z-index:20;
       background:#fff;
       border-bottom:1px solid var(--border);
+      /* Own all touch gestures inside the frame so a drag orbits the camera
+         instead of scrolling the page — this is the clear frame/controls
+         boundary. The page scrolls by touching the sidebar below. */
+      touch-action:none;
     }
 
     /* The sidebar: full width, below the frame, flows with the page — no
@@ -274,7 +278,7 @@
     .seg button{padding:12px 4px;font-size:12px;}
     #units button{padding:9px 18px;font-size:12px;}
     #units{bottom:16px;}
-    #hint{bottom:58px;}
+    #hint{display:none;}       /* orbit hint clutters the small mobile frame */
     .slot{height:96px;}
     .slot.wide{height:120px;}
     #newBtn{padding:11px 16px;font-size:14px;}

@@ -82,6 +82,10 @@ function init(container, opts){
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputEncoding = THREE.sRGBEncoding;
   container.appendChild(renderer.domElement);
+  // Without this, a touch-drag on the canvas is treated as a page scroll: the
+  // browser fires pointercancel mid-drag, so the orbit freezes and the page
+  // scrolls under the finger. Owning the gesture keeps pointermove flowing.
+  renderer.domElement.style.touchAction = 'none';
 
   // Render-coupled overlays the renderer owns and positions each frame. Created
   // here (not read from the page) so the module carries no dependency on the
@@ -145,11 +149,21 @@ function init(container, opts){
   }
 
   let drag=false, lx=0, ly=0;
-  renderer.domElement.addEventListener('pointerdown', e=>{
-    if(state.view!=='iso') return; drag=true; lx=e.clientX; ly=e.clientY;
+  const cv = renderer.domElement;
+  cv.addEventListener('pointerdown', e=>{
+    if(state.view!=='iso') return;
+    drag=true; lx=e.clientX; ly=e.clientY;
+    // Capture the pointer so every move/up for this finger is delivered here,
+    // even if it strays off the canvas mid-drag (a full orbit sweeps well past
+    // the frame edges on a phone). Without it the drag drops when the finger
+    // leaves the element and the rotation stalls.
+    try{ cv.setPointerCapture(e.pointerId); }catch(_){}
   });
-  addEventListener('pointerup', ()=> drag=false);
-  addEventListener('pointermove', e=>{
+  const endDrag = ()=> drag=false;
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  addEventListener('pointerup', endDrag);   // safety net if capture is ever lost
+  cv.addEventListener('pointermove', e=>{
     if(!drag) return;
     orbit.az -= (e.clientX-lx)*0.006;
     orbit.pol = Math.min(POL_MAX, Math.max(POL_MIN, orbit.pol - (e.clientY-ly)*0.006));
