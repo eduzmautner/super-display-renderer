@@ -682,8 +682,14 @@ function init(container, opts){
   }
 
   // ============ cameras ============
+  // Keep this breakpoint in step with the CSS @media (max-width:768px) that
+  // switches the layout to the stacked/full-bleed mobile mode.
+  const mobileMQ = window.matchMedia('(max-width: 768px)');
   function stageSize(){
-    return Math.max(240, Math.min(container.clientWidth, container.clientHeight) - 48);
+    // Desktop insets the square canvas so it reads as a floating card; mobile
+    // goes full-bleed, filling the smaller frame dimension edge-to-edge.
+    const inset = mobileMQ.matches ? 0 : 48;
+    return Math.max(240, Math.min(container.clientWidth, container.clientHeight) - inset);
   }
   function fitRadius(){
     const fov = fovFromFocal(state.focal) * Math.PI / 180;

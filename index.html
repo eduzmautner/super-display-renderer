@@ -232,17 +232,21 @@
 
     #app{flex-direction:column;height:auto;min-height:100%;}
 
-    /* The frame: full width, 58vh, pinned to the top of the page. As the
-       sidebar below scrolls, this stays put (sticky) with an opaque
-       background, so the model updates in real time while you scroll. */
+    /* The frame: full width, 50vh (an even 50/50 split with the sidebar
+       below), pinned to the top of the page. As the sidebar scrolls, this
+       stays put (sticky) so the model updates in real time. On mobile the
+       frame goes full-bleed white — the canvas fills it edge-to-edge (see
+       stageSize + the canvas rule below), so we match its background here
+       rather than the desktop dark card. */
     #viewport{
       order:-1;                /* markup is panel-then-viewport; put the frame on top */
       flex:0 0 auto;
       width:100%;
-      height:58vh;
+      height:50vh;
       position:sticky;
       top:0;
       z-index:20;
+      background:#fff;
       border-bottom:1px solid var(--border);
     }
 
@@ -254,8 +258,8 @@
       border-right:none;
       overflow:visible;
     }
-    /* Brand can't be sticky here or it would fight the pinned frame. */
-    .brand{position:static;}
+    /* Brand/logo is desktop-only; the pinned frame is the mobile header. */
+    .brand{display:none;}
 
     /* ---- touch-friendly control sizing ---- */
     .group{padding:16px 18px;}
@@ -275,9 +279,11 @@
     .slot.wide{height:120px;}
     #newBtn{padding:11px 16px;font-size:14px;}
 
-    /* The 1:1 export-ratio canvas stays square + centred inside the frame.
-       (stageSize() already fits it to the smaller of width/height.) */
-    #viewport canvas{max-width:100%;max-height:100%;}
+    /* The canvas stays 1:1 (export ratio) and centred, but full-bleed: it
+       fills the smaller frame dimension edge-to-edge — no inset, no card
+       radius/shadow. The white #viewport background covers any remaining
+       margin on the longer axis, so the whole frame reads as one white field. */
+    #viewport canvas{max-width:100%;max-height:100%;border-radius:0;box-shadow:none;}
 
     /* ---- UV editor: fills the screen, controls wrap ---- */
     .modal{width:96vw;max-width:96vw;}
