@@ -26,7 +26,8 @@
   html,body{margin:0;height:100%;background:#0e0f12;color:var(--text);font-family:var(--sans);overflow:hidden;}
   #app{display:flex;height:100%;}
 
-  #panel{width:374px;min-width:374px;background:var(--panel-bg);border-right:1px solid var(--border);
+  #panel{width:var(--panel-w,374px);min-width:var(--panel-w,374px);
+         background:var(--panel-bg);border-right:1px solid var(--border);
          display:flex;flex-direction:column;overflow-y:auto;}
   #panel::-webkit-scrollbar{width:8px;}
   #panel::-webkit-scrollbar-thumb{background:#333;border-radius:4px;}
@@ -182,7 +183,17 @@
   input.numval::-webkit-outer-spin-button,
   input.numval::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 
-  #viewport{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#16191f;}
+  /* Drag handle between the sidebar and the 3D frame. The hit area is wider than
+     the visible line so it's easy to grab, and the line only tints on hover/drag. */
+  #resizer{flex:0 0 5px;width:5px;cursor:col-resize;position:relative;z-index:6;
+           background:transparent;transition:background .15s;}
+  #resizer::before{content:'';position:absolute;top:0;bottom:0;left:-3px;right:-3px;}
+  #resizer:hover,#resizer.dragging{background:var(--accent);}
+  #resizer:focus-visible{outline:none;background:var(--accent);}
+  body.col-resizing{cursor:col-resize;user-select:none;}
+  body.col-resizing #viewport canvas{pointer-events:none;}
+
+  #viewport{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#16191f;min-width:0;}
   #viewport canvas{display:block;border-radius:8px;box-shadow:0 0 0 1px var(--border), 0 18px 50px rgba(0,0,0,.45);}
   #credit{position:absolute;right:16px;bottom:12px;z-index:4;
           display:flex;flex-direction:column;align-items:flex-end;gap:8px;
@@ -254,6 +265,8 @@
       border-right:none;
       overflow:visible;
     }
+    /* Stacked layout: no vertical divider to drag. */
+    #resizer{display:none;}
     /* Brand can't be sticky here or it would fight the pinned frame. */
     .brand{position:static;}
 
@@ -454,6 +467,8 @@
       </div>
     </div>
   </div>
+
+  <div id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" tabindex="0"></div>
 
   <div id="viewport">
     <button class="btn ghost" id="newBtn">New +</button>
@@ -943,6 +958,80 @@ function bootApp(){
   placeAllThumbs();
   requestAnimationFrame(()=> segThumbs.forEach(({thumb})=> thumb.classList.add('animate')));
   addEventListener('resize', placeAllThumbs);
+
+  // ============ resizable sidebar ============
+  // Figma-style: drag the divider between the sidebar and the 3D frame. The width
+  // lives in a CSS custom property so one assignment moves the panel, and the
+  // renderer is told to resize on each frame of the drag so the square canvas
+  // refits live. Width persists across sessions.
+  (function initResizer(){
+    const PANEL_MIN = 300;      // narrow enough to be useful, wide enough to stay usable
+    const PANEL_DEFAULT = 374;
+    const VIEWPORT_MIN = 360;   // never let the drag squeeze the 3D frame away
+    const KEY = 'sdr.panelWidth';
+    const resizer = $('resizer');
+    const root = document.documentElement;
+
+    const maxWidth = () => Math.max(PANEL_MIN, window.innerWidth - VIEWPORT_MIN);
+    const clamp = w => Math.min(maxWidth(), Math.max(PANEL_MIN, w));
+
+    function apply(w, persist){
+      const v = clamp(w);
+      root.style.setProperty('--panel-w', v + 'px');
+      if(persist){
+        try { localStorage.setItem(KEY, String(v)); } catch(e){ /* private mode */ }
+      }
+      api.resize();          // refit the square canvas to the new frame width
+      placeAllThumbs();      // segmented-control highlights re-measure
+      return v;
+    }
+
+    // restore a saved width (ignored on mobile, where the media query overrides it)
+    let saved = null;
+    try { saved = parseInt(localStorage.getItem(KEY), 10); } catch(e){}
+    if(saved && isFinite(saved)) apply(saved, false);
+
+    let dragging = false;
+    resizer.addEventListener('pointerdown', e=>{
+      dragging = true;
+      resizer.setPointerCapture(e.pointerId);
+      resizer.classList.add('dragging');
+      document.body.classList.add('col-resizing');
+      e.preventDefault();
+    });
+    resizer.addEventListener('pointermove', e=>{
+      if(!dragging) return;
+      // panel starts at the left edge, so pointer x is the width directly
+      apply(e.clientX - $('app').getBoundingClientRect().left, false);
+    });
+    ['pointerup','pointercancel'].forEach(ev=>
+      resizer.addEventListener(ev, ()=>{
+        if(!dragging) return;
+        dragging = false;
+        resizer.classList.remove('dragging');
+        document.body.classList.remove('col-resizing');
+        // commit the final width once, rather than writing on every move
+        apply(parseInt(getComputedStyle(root).getPropertyValue('--panel-w'), 10) || PANEL_DEFAULT, true);
+      }));
+
+    // double-click the divider to snap back to the default width
+    resizer.addEventListener('dblclick', ()=> apply(PANEL_DEFAULT, true));
+
+    // keyboard nudging for accessibility
+    resizer.addEventListener('keydown', e=>{
+      const step = e.shiftKey ? 40 : 12;
+      const cur = parseInt(getComputedStyle(root).getPropertyValue('--panel-w'), 10) || PANEL_DEFAULT;
+      if(e.key === 'ArrowLeft'){ apply(cur - step, true); e.preventDefault(); }
+      else if(e.key === 'ArrowRight'){ apply(cur + step, true); e.preventDefault(); }
+      else if(e.key === 'Home'){ apply(PANEL_DEFAULT, true); e.preventDefault(); }
+    });
+
+    // keep the panel legal if the window shrinks under the current width
+    addEventListener('resize', ()=>{
+      const cur = parseInt(getComputedStyle(root).getPropertyValue('--panel-w'), 10);
+      if(cur && clamp(cur) !== cur) apply(cur, false);
+    });
+  })();
 }
 </script>
 </body>
